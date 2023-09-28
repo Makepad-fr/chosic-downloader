@@ -1,0 +1,44 @@
+{
+  "name": "chosic-downloader",
+  "version": "1.0.0",
+  "description": "Download any music from chosic.com",
+  "main": "dist/index.js",
+  "scripts": {
+    "postinstall": "npx playwright install",
+    "compile": "npx tsc -p tsconfig.json",
+    "compile:watch": "npx tsc -p tsconfig.json --watch",
+    "prettier": "npx prettier --write \"src/**/*.{ts,tsx,js,jsx,json,md}\"",
+    "build": "npm run prettier && npm run compile",
+    "prestart": "npm run build",
+    "start": "node out/index.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+ssh://git@github.com/Makepad-fr/chosic-downloader.git"
+  },
+  "keywords": [
+    "TypeScript",
+    "WebScraper",
+    "Playwright",
+    "Downloader",
+    "NodeJS",
+    "npm",
+    "music",
+    "downloader"
+  ],
+  "author": "Makepad Developers <dev@makepad.fr>",
+  "license": "GPL-3.0-or-later",
+  "bugs": {
+    "url": "https://github.com/Makepad-fr/chosic-downloader/issues"
+  },
+  "homepage": "https://github.com/Makepad-fr/chosic-downloader#readme",
+  "devDependencies": {
+    "babel-plugin-filter-imports": "^4.0.0",
+    "eslint": "^8.50.0",
+    "prettier": "^3.0.3",
+    "typescript": "^5.2.2"
+  },
+  "dependencies": {
+    "playwright": "^1.38.1"
+  }
+}
