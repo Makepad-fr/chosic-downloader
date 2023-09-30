@@ -4,6 +4,7 @@ import { tmpdir } from 'os';
 import { mkdirSync, createWriteStream, unlink } from 'fs';
 import { join } from 'path';
 import * as https from 'https';
+const FREE_MUSIC_BASE_URL = 'https://www.chosic.com/free-music';
 
 const ACCEPT_COOKIE_BUTTON_SELECTOR =
   '//div[contains(@role,"dialog")]//button[contains(@mode, "primary")]';
@@ -24,16 +25,18 @@ const DOWNLOAD_BUTTON_WRAPPER_SELECTOR = `${MAIN_TRACK_SELECTOR}/div[contains(@c
 const DOWNLOAD_BUTTON_SELECTOR = `${DOWNLOAD_BUTTON_WRAPPER_SELECTOR}/button[contains(@class,"download")]`;
 const DOWNLOAD_LINK_SELECTOR = '//a[contains(@class,"download2")]';
 const DOWNLOADER_TEMP_FOLDER_PREFIX = 'choisic-downloads';
+
 type DownloaderOptions = {
-  baseURL: string;
+  category: string | undefined;
   headless?: boolean;
   browser?: Browser | undefined;
   page?: Page | undefined;
   bypassCookies?: boolean;
   downloadFilePath?: string;
+  baseURL?: string;
 };
 
-type DownloaderConfig = Required<DownloaderOptions>;
+type DownloaderConfig = Required<Omit<DownloaderOptions, 'category'>>;
 
 export type TrackInfo = {
   title: string;
@@ -215,6 +218,12 @@ async function downloadFile(
 async function getDownloaderConfig(
   options: DownloaderOptions,
 ): Promise<DownloaderConfig> {
+  if (options.baseURL === undefined) {
+    options.baseURL = FREE_MUSIC_BASE_URL;
+  }
+  if (options.category !== undefined) {
+    options.baseURL = join(options.baseURL, options.category);
+  }
   if (options.headless === undefined) {
     options.headless = true;
   }
