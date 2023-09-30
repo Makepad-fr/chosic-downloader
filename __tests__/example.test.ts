@@ -1,4 +1,4 @@
-import { downloadTrack } from "../src/chosic-downloader";
+import { downloadTrack } from "../src/downloader";
 
 const TRACK_URL = 'https://www.chosic.com/download-audio/45401/';
 
