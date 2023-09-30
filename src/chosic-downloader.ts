@@ -9,6 +9,13 @@ const TRACK_INFO_DOWNLOAD_BUTTON_SELECTOR =
 const NAVLINKS_SELECTOR =
   "//div[contains(@class,'nav-links')]//a[@class=  'page-numbers']";
 const LAST_PAGE_NUMBER_SELECTOR = `${NAVLINKS_SELECTOR}[last()]`;
+const TRACK_TITLE_WRAPPER_SELECTOR =
+  "//div[contains(@class, 'main-track')]/div[contains(@class, 'track-title-wrap')]";
+const TRACK_TITLE_SELECTOR = '//div[contains(@class,"trackF-title-inside")]';
+const TRACK_ARTIST_SELECTOR =
+  '//div[@class="artist-track"]/a[contains(@class,"artist-name")]';
+const TAGS_WRAPPER_SELECTOR = "//div[contains(@class,'tagcloud-names')]";
+const TAG_SELECTOR = "//a[contains(@class,'tag-cloud-link-names')]";
 
 type DownloaderOptions = {
   baseURL: string;
@@ -18,12 +25,18 @@ type DownloaderOptions = {
   bypassCookies?: boolean;
 };
 
-type DownloaderConfig = {
-  baseURL: string;
-  headless: boolean;
-  browser: Browser;
-  page: Page;
-  bypasCookies: boolean;
+type DownloaderConfig = Required<DownloaderOptions>;
+
+export type TrackInfo = {
+  title: string;
+  artistName: string;
+  tags: string[];
+};
+
+export type Track = {
+  info: TrackInfo;
+  url: string;
+  downloadedFilePath: string;
 };
 /**
  * Get the list of URLs for download pages of tracks
@@ -33,7 +46,7 @@ type DownloaderConfig = {
 export async function getTrackLinks(
   options: DownloaderOptions,
   pageNumber: number | undefined = undefined,
-): Promise<string[]> {
+): Promise<{ config: DownloaderConfig; trackLinks: string[] }> {
   const config = await getDownloaderConfig(options);
   if (pageNumber === undefined) {
     await config.page.goto(getURL(config.baseURL, 1));
@@ -46,10 +59,75 @@ export async function getTrackLinks(
       await config.page.goto(getURL(config.baseURL, i));
       links.push(...(await getTrackDownloadLinks(config)));
     }
-    return links;
+    return { config, trackLinks: links };
   }
   await config.page.goto(getURL(config.baseURL, pageNumber));
-  return getTrackDownloadLinks(config);
+  return { config, trackLinks: await getTrackDownloadLinks(config) };
+}
+
+/**
+ * Downloads and returns the information about track
+ * @param options downloader optons to use to download track
+ * @returns The track information for the downloaded track
+ */
+export async function downloadTrack(
+  options: DownloaderOptions,
+): Promise<Track> {
+  // Convert options to
+  console.debug('Downloading track');
+  const config = await getDownloaderConfig(options);
+  await config.page.goto(config.baseURL);
+  console.debug(`Navigated to ${config.baseURL}`);
+  const trackInfo = await getTrackInformation(config);
+  cleanDownloader(config);
+  // TODO: Continue from here,download tracks
+  return { info: trackInfo, url: '', downloadedFilePath: '' };
+}
+
+async function getTrackInformation(
+  config: DownloaderConfig,
+): Promise<TrackInfo> {
+  // Wait for title wrapper
+  try {
+    const titleWrapperElement = await config.page.waitForSelector(
+      TRACK_TITLE_WRAPPER_SELECTOR,
+    );
+
+    const tagsWrapperElement = await config.page.waitForSelector(
+      TAGS_WRAPPER_SELECTOR,
+    );
+    const [trackTitleElement, trackArtistElement, tagElements] =
+      await Promise.all([
+        titleWrapperElement.$(TRACK_TITLE_SELECTOR),
+        titleWrapperElement.$(TRACK_ARTIST_SELECTOR),
+        tagsWrapperElement.$$(TAG_SELECTOR),
+      ]);
+    if (trackTitleElement === null) {
+      console.error('Track title element is null');
+      return Promise.reject('Track title element');
+    }
+    if (trackArtistElement === null) {
+      console.error('Track artist element is null');
+      return Promise.reject('Track artist element');
+    }
+    const [title, artist, tags] = await Promise.all([
+      trackTitleElement.textContent(),
+      trackArtistElement.textContent(),
+      Promise.all(tagElements.map((e) => e.textContent())),
+    ]);
+    if (tags.some((e) => e === null)) {
+      return Promise.reject("There's at least a tag which is null");
+    }
+    return {
+      title: title as string,
+      artistName: artist as string,
+      tags: tags as string[],
+    };
+  } catch (e) {
+    console.error('Error while getting track information');
+    console.error(e);
+  }
+  return { title: '', tags: [], artistName: '' };
 }
 
 /**
@@ -75,17 +153,22 @@ async function getDownloaderConfig(
   return options as DownloaderConfig;
 }
 
+/**
+ * Get the download links of tracks wth the given configuration
+ * @param config The configuration to use when getting track links
+ * @returns The list of track download links
+ */
 async function getTrackDownloadLinks(
   config: DownloaderConfig,
 ): Promise<string[]> {
-  if (!config.bypasCookies) {
+  if (!config.bypassCookies) {
     try {
       const element = await config.page.waitForSelector(
         ACCEPT_COOKIE_BUTTON_SELECTOR,
       );
       console.debug('Accept cookie button found');
       await element.click();
-      config.bypasCookies = true;
+      config.bypassCookies = true;
     } catch {
       console.debug('Cookie accept button is not present');
     }
@@ -115,6 +198,15 @@ async function getTrackDownloadLinks(
     `Number of track links ${trackLinks.length} is different then number of track elements ${trackInfoElements.length}`,
   );
   return trackLinks;
+}
+
+/**
+ * Cleansup the downloader configuration, closes the page and the browser
+ * @param config The configuration to cleanup
+ */
+export async function cleanDownloader(config: DownloaderConfig) {
+  await config.page.close();
+  await config.browser.close();
 }
 
 /**
